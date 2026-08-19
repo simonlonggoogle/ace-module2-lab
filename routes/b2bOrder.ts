@@ -16,7 +16,28 @@ import * as utils from '../lib/utils'
 export function b2bOrder () {
   return ({ body }: Request, res: Response, next: NextFunction) => {
     if (utils.isChallengeEnabled(challenges.rceChallenge) || utils.isChallengeEnabled(challenges.rceOccupyChallenge)) {
-      const orderLinesData = body.orderLinesData || ''
+      const orderLinesData = typeof body.orderLinesData === 'string' ? body.orderLinesData : ''
+      
+      const lowerData = orderLinesData.toLowerCase()
+      const blockedKeywords = [
+        'constructor', 'prototype', '__proto__', 'process', 'require',
+        'global', 'window', 'document', 'function', 'eval', 'exec',
+        'spawn', 'child_process', 'mainmodule', 'import', 'export',
+        'reflect', 'proxy', 'object', 'this', 'self', 'parent',
+        'top', 'frames', 'arguments', 'caller', 'callee',
+        '__definegetter__', '__definesetter__'
+      ]
+      const containsBlockedKeyword = blockedKeywords.some(keyword => lowerData.includes(keyword))
+      
+      if (orderLinesData.includes('\\') || 
+          orderLinesData.includes('[') || 
+          orderLinesData.includes(']') || 
+          (orderLinesData.includes('<') && orderLinesData.includes('>')) || 
+          containsBlockedKeyword) {
+        res.status(400).json({ status: 'error', error: 'Invalid order lines data detected.' })
+        return
+      }
+
       try {
         const sandbox = { safeEval, orderLinesData }
         vm.createContext(sandbox)
